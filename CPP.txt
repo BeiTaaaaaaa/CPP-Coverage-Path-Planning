@@ -1,0 +1,136 @@
+“图形学裁剪 + 割草机覆盖路径规划”研究资料汇编
+以下按照文献调研 → 工具链选型 → 核心算法 → 数据集与基准 → 开源项目 → 创新方向的逻辑整理，可直接作为你的研究起点。
+
+一、必读综述文献
+1.1 核心综述（必读）
+A Comprehensive Survey on Coverage Path Planning for Mobile Robots in Dynamic Environments
+
+作者：K. P. Jayalakshmi, Vishnu G. Nair, Dayakshini Sathish
+
+期刊：IEEE Access, Volume 13, Pages 60158–60185, 2025年3月31日
+
+DOI：10.1109/ACCESS.2025.3556446
+
+这篇综述系统回顾了CPP在动态环境下的最新算法和方法论，重点讨论了环境变化性、障碍物动态性和实时计算需求带来的挑战。它覆盖了从家庭扫地机器人、割草到排雷、水下成像、复杂结构检测等多种应用场景。论文明确指出，在动态环境中实现完整覆盖且最小化重叠和时间/能量消耗是一个复杂问题，这正是你研究方向的核心痛点。
+
+阅读建议：重点关注综述中关于“动态环境下的重规划策略”和“算法分类与性能评估”章节，它们直接对应你“增量式裁剪”的创新方向。
+
+1.2 补充综述
+3D Path Planning for Autonomous Agricultural Machinery（2026年，ScienceDirect）：系统回顾了3D农业机械路径规划，涉及非完整约束、Dubins/Reeds-Shepp曲线在覆盖路径规划中的嵌入方式
+
+Agricultural machinery automatic navigation technology（2023年，Cell）：讨论了A与DWA的结合，以及Hybrid A在考虑车辆运动学约束方面的优势
+
+二、核心工具链
+2.1 几何计算库
+工具	语言	核心功能	推荐场景	获取方式
+CGAL	C++	精确多边形偏移、直骨架、Minkowski和	研究级精度要求	官网下载
+Clipper2	C++/C#/Dart/Python	布尔运算（交/并/差/异或）、多边形偏移	快速原型与集成	GitHub
+Shapely	Python	基于GEOS，多边形操作	Python快速验证	pip install shapely
+Clipper2 是 Angus Johnson 开发的C++多边形裁剪库，支持简单和复杂多边形的交、并、差、异或布尔运算，以及多边形偏移。Python绑定（clipper2-py）提供完整的C++ API访问，支持numpy输入输出。其性能在大型联合运算和缓冲操作上可媲美甚至优于Shapely。
+
+CGAL 提供精确的 inward offset contours 构建，基于直骨架算法，适用于带孔洞的简单多边形。其 offset_polygon_2 函数可以精确计算多边形按有理半径 
+r
+r 的偏移。对于需要理论保证的研究，CGAL的精确算术是重要优势。
+
+选型建议：原型阶段用 Python + Shapely/Clipper2 快速验证几何逻辑；性能关键部分用 C++ + CGAL 重写。
+
+2.2 覆盖路径规划框架
+Fields2Cover——目前最成熟的农业CPP开源库
+
+语言：C++17核心，提供Python绑定
+
+模块化管线：地头生成 → 条带生成 → 路线规划 → 路径规划，各模块可独立替换
+
+支持非凸田地和障碍物，通过梯形分解和牛耕分解处理
+
+路线优化集成 OR-Tools，同时支持牛耕、蛇形、螺旋等经典模式
+
+运动学可行转弯使用 Dubins 和 Reeds-Shepp 曲线，支持连续曲率
+
+提供 ROS 2 集成（通过 opennav_coverage）
+
+GitHub：https://github.com/Fields2Cover/Fields2Cover
+
+关键限制：Fields2Cover的原始版本在非凸田地上处理能力有限，对需要补充作业（refill trips）的操作支持不足，这正是Fields2Benchmark要解决的问题。
+
+2.3 优化求解器
+OR-Tools（Google）：Fields2Cover内部用于路线优化，求解GTSP问题成熟稳定
+
+可选替代：LKH（大规模TSP/GTSP）、Gurobi（学术免费）
+
+2.4 仿真平台
+ROS 2 + Gazebo：机器人标准工具链。Fields2Cover已通过opennav_coverage提供Nav2兼容的覆盖任务服务器
+
+Matplotlib：快速绘制多边形和路径，适合算法调试
+
+RViz：ROS 2环境下的实时可视化
+
+2.5 路径平滑
+Dubins曲线：仅前进运动的最短路径，由6种直线-圆弧组合构成
+
+Reeds-Shepp曲线：允许前进和后退的组合
+
+Fields2Cover的路径规划模块已支持这两种曲线的实现
+
+三、核心算法与理论基础
+3.1 牛耕式细胞分解
+BCD是CPP的经典方法，术语“boustrophedon”源自希腊语“牛耕时转弯的方式”，象征来回扫掠运动。通过扫描线检测自由空间连通性变化，每次检测到变化就形成新单元。开源实现包括 devanys/Coverage-Path-Planning-The-Boustrophedon-Cellular-Decomposition，支持加载二值PNG地图、自动转换为占据栅格、BCD分解和牛耕模式生成。
+
+3.2 图形学裁剪算法
+算法	适用场景	特点
+Sutherland-Hodgman	凸/凹多边形对凸窗口	较简单，但结果可能产生退化边
+Weiler-Atherton	任意多边形对任意多边形，支持带孔多边形	可裁剪带孔多边形对带孔多边形
+Cyrus-Beck / Liang-Barsky	线段对凸多边形	参数化裁剪，计算高效
+Vatti	复杂多边形布尔运算	工业级鲁棒性
+Weiler-Atherton算法可以处理带孔多边形对带孔多边形的裁剪。该算法通过遍历主体多边形边界，找到与窗口多边形的交点，然后根据入/出对沿边界行走，生成裁剪后的多边形。这正是你“裁剪驱动覆盖”思路的核心几何工具。
+
+3.3 非完整约束下的路径规划
+Hybrid A + Dubins/Reeds-Shepp* 是当前农业路径规划的主流方法。最新研究（2026年）提出了一种基于Hybrid A的实时转弯路径规划算法，结合解析Reeds-Shepp和Dubins路径计算与四维A搜索，随后用梯度下降平滑实现路径可行性。该算法满足单次函数调用最大100ms的实时约束，在真实拖拉机上进行了田间实验验证。
+
+3.4 凹多边形分解
+对于复杂凹区域，常用策略是先分解为凸子区域再分别覆盖。2025年《Scientific Reports》发表的方法使用旋转卡尺技术进行凹多边形凸分解。另一篇2026年的研究提出了非线性权重分解方法，将凹多边形区域划分为尽可能少的凸子区域。
+
+四、数据集与基准
+4.1 Fields2Benchmark（首选）
+发布：2025年，Smart Agricultural Technology, Vol.12
+
+包含：16种算法、8种目标函数、350个真实田地
+
+特点：涵盖非凸田地和田地内障碍物，将问题分解为田地分解、地头生成、条带生成、路线规划、路径规划五个单元，支持模块化评估和互换算法
+
+扩展了Fields2Cover，增加了田地分割模块、缩短路线和处理补充作业的新算法
+
+输出为结构化数值数据和可视化表示
+
+这是你实验对比的标准基准，可以直接使用其350个田地进行公平比较。
+
+4.2 其他数据集
+Hexagonal Maritime CPP Dataset（2026年，Zenodo）：六边形网格上的CPP数据集，适用于图基和学习型覆盖规划，含10,000个Hamiltonian可行实例
+
+Nilsson‘s benchmark：38个凸田地，用于Fields2Cover的初始实验
+
+五、开源项目与代码资源
+项目	平台	内容	链接
+Fields2Cover	GitHub	农业CPP完整框架	github.com/Fields2Cover/Fields2Cover
+BCD覆盖规划	GitHub	BCD算法CPP仿真	github.com/devanys/Coverage-Path-Planning-The-Boustrophedon-Cellular-Decomposition
+RicheyHuang BCD	GitHub	BCD路径规划	github.com/RicheyHuang/BoustrophedonCellularDecompositionPathPlanning
+opennav_coverage	GitHub	Nav2覆盖任务服务器	github.com/open-navigation/opennav_coverage
+field-coverage	PyPI	损伤感知CPP（GTSP建模）	pip install field-coverage
+Clipper2	GitHub	多边形裁剪库	github.com/AngusJohnson/Clipper2
+六、你的创新方向与资料对应表
+创新方向	需要深入阅读的资料	需要使用的工具
+动态增量裁剪	2025 IEEE Access综述中动态环境章节	Clipper2布尔运算 + 增量式GTSP更新
+非完整约束裁剪联合优化	Hybrid A* + Dubins/Reeds-Shepp论文	Fields2Cover路径规划模块 + CGAL
+多机协同视口裁剪	综述中多机器人协作章节	Fields2Cover + OR-Tools
+裁剪驱动的能耗优化	Fields2Cover的土壤压实模型	OR-Tools多目标优化
+GPU并行裁剪	无直接对应文献，属于方法创新	CUDA + Clipper2
+七、推荐研究路径
+第1-2周：精读2025 IEEE Access综述，理解CPP在动态环境下的核心挑战和现有方法分类。同时安装Fields2Cover（pip install fields2cover），跑通基础示例，熟悉其模块化管线。
+
+第3-4周：用Python + Shapely/Clipper2实现裁剪驱动的扫描线有效区间提取，验证凹多边形和孔洞处理。参考BCD开源项目的分解逻辑。
+
+第5-6周：选择一个创新方向深入。推荐动态增量裁剪——实现新障碍出现时仅重算受影响的扫描线，与全局重算进行速度对比。
+
+第7-8周：在Fields2Benchmark的350个田地上进行系统评估，与Fields2Cover内置算法对比覆盖率、路径长度、空走率、计算时间。
+
+第9-10周：整理代码，编写README，发布到GitHub。

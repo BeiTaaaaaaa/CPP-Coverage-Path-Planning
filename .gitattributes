@@ -1,0 +1,19 @@
+# Normalise line endings in the repository to LF so the code is portable.
+# The working copy is checked out with the platform's native endings.
+* text=auto eol=lf
+
+# Binary or generated content that must never be line-ending converted.
+*.png binary
+*.jpg binary
+*.pdf binary
+*.deb binary
+*.gz binary
+*.zip binary
+*.pt binary
+
+# Data and results: keep them exactly as produced, so a diff means a real change.
+*.csv text eol=lf
+*.json text eol=lf
+*.md text eol=lf
+*.py text eol=lf
+*.sh text eol=lf

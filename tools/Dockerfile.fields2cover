@@ -1,0 +1,81 @@
+# =============================================================================
+# Fields2Cover reference baseline image (CPP research project)
+# =============================================================================
+# Builds a Linux (Ubuntu 24.04 "noble") image with Fields2Cover + its Python
+# bindings pre-installed, WITHOUT needing any compile step or GitHub access.
+#
+# Why this way:
+#   * The PyPI package `fields2cover` 2.1.x is sdist-only and its CMake build
+#     pulls dependencies from github.com, which is unreachable from this host.
+#   * Fields2Cover is released as a prebuilt ROS 2 (Jazzy / noble) Debian
+#     package that DOES contain the Python module
+#     (/opt/ros/jazzy/lib/python3.12/site-packages/fields2cover/...),
+#     including the bundled C++ OR-Tools dependency (ros-jazzy-ortools-vendor).
+#   * packages.ros.org is unreachable from this host, so the Tsinghua University
+#     (TUNA) mirror of the official ROS 2 apt repo is used. The repo is signed
+#     with the official ROS GPG key (tools/ros.key), so packages stay verified.
+#
+# Build (from a Windows shell):
+#   docker build -f C:\Users\666\Desktop\CPP\tools\Dockerfile.fields2cover ^
+#                -t fields2cover:2.1.1 C:\Users\666\Desktop\CPP\tools
+# =============================================================================
+
+FROM ubuntu:24.04
+
+ENV DEBIAN_FRONTEND=noninteractive
+
+# --- 1a. Bootstrap CA certificates from the stock archive (plain HTTP, so it
+#         works before ca-certificates exists).  Only a few small packages. --
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends ca-certificates curl gnupg
+
+# --- 1b. Only now point Ubuntu's own archive at a faster, reachable mirror --
+#         (noble uses the deb822 format: /etc/apt/sources.list.d/ubuntu.sources)
+RUN sed -i \
+      -e 's|http://archive.ubuntu.com/ubuntu|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' \
+      -e 's|http://security.ubuntu.com/ubuntu|https://mirrors.tuna.tsinghua.edu.cn/ubuntu|g' \
+      /etc/apt/sources.list.d/ubuntu.sources
+
+# --- 2. Add the official ROS 2 apt repository (TUNA mirror), signed by the
+#        official ROS key shipped next to this Dockerfile -------------------
+COPY ros.key /usr/share/keyrings/ros-archive-keyring.gpg
+
+RUN echo "deb [arch=amd64 signed-by=/usr/share/keyrings/ros-archive-keyring.gpg] \
+https://mirrors.tuna.tsinghua.edu.cn/ros2/ubuntu noble main" \
+      > /etc/apt/sources.list.d/ros2.list
+
+# --- 3. Install Fields2Cover (library + Python bindings, prebuilt) ---------
+#      gnuplot-nox is needed by f2c.Visualizer.save(): the ROS build of the
+#      visualiser renders through gnuplot, and without it save() returns
+#      silently WITHOUT writing any file (it just prints "gnuplot: not found").
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends \
+        ros-jazzy-fields2cover \
+        python3 \
+        python3-matplotlib \
+        python3-numpy \
+        gnuplot-nox \
+ && rm -rf /var/lib/apt/lists/*
+
+# --- 4. Make the ROS-installed Python module importable without sourcing ----
+#        /opt/ros/jazzy/setup.bash (convenient for plain `python3 script.py`).
+#        NOTE: libFields2Cover.so needs libortools.so.9, which the
+#        ros-jazzy-ortools-vendor package installs under
+#        /opt/ros/jazzy/opt/ortools_vendor/lib - that directory must be on the
+#        loader path, otherwise `import fields2cover` fails with
+#        "ImportError: libortools.so.9: cannot open shared object file".
+RUN echo "/opt/ros/jazzy/opt/ortools_vendor/lib" \
+      > /etc/ld.so.conf.d/fields2cover.conf \
+ && echo "/opt/ros/jazzy/lib/x86_64-linux-gnu" \
+      >> /etc/ld.so.conf.d/fields2cover.conf \
+ && ldconfig
+
+ENV PYTHONPATH=/opt/ros/jazzy/lib/python3.12/site-packages
+ENV LD_LIBRARY_PATH=/opt/ros/jazzy/opt/ortools_vendor/lib:/opt/ros/jazzy/lib/x86_64-linux-gnu:/opt/ros/jazzy/lib
+
+# matplotlib without a display
+RUN mkdir -p /root/.config/matplotlib \
+ && echo "backend: Agg" > /root/.config/matplotlib/matplotlibrc
+
+WORKDIR /work
+CMD ["/bin/bash"]

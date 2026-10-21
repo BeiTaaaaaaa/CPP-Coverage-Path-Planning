@@ -1,0 +1,116 @@
+# ---------------------------------------------------------------------------
+# cppclip — what git should and should not carry
+#
+# The rule this file follows: track what a reader needs to *check* the claims,
+# ignore what a reader can *regenerate*.  Source, the result tables behind every
+# quoted number, and the figures the documents embed are tracked, because
+# without them the write-up cannot be verified without re-running a 50-minute
+# pipeline.  Virtual environments, datasets, container images and the raw
+# exchanged solutions are ignored: they are large, reproducible from a script
+# or a DOI, and would bloat a clone to over a gigabyte.
+# ---------------------------------------------------------------------------
+
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+.eggs/
+build/
+dist/
+pip-wheel-metadata/
+MANIFEST
+
+# --- virtual environments ---------------------------------------------------
+.venv/
+venv/
+.venv*/
+# NOTE: fields2cover's build workspace also lives here and is ignored further
+# down under "Fields2Cover build artefacts" -- it is *not* a virtualenv.
+
+# --- scratch space ----------------------------------------------------------
+.tmp/
+
+# --- tooling caches ---------------------------------------------------------
+.pytest_cache/
+.cache/
+.mypy_cache/
+.ruff_cache/
+.pytype/
+*.log
+
+# --- test and coverage artefacts -------------------------------------------
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+.tox/
+.nox/
+.hypothesis/
+
+# --- OS junk ----------------------------------------------------------------
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+Thumbs.db
+ehthumbs.db
+desktop.ini
+
+# --- editor junk ------------------------------------------------------------
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+*.orig
+*.rej
+
+# ---------------------------------------------------------------------------
+# What is deliberately NOT ignored
+# ---------------------------------------------------------------------------
+# results/figures/  the report embeds these; without them it renders with broken
+#                   images, and a reader cannot see the evidence without
+#                   re-running a 50-minute pipeline.
+# results/gui/      screenshots of the viewer, embedded in the READMEs.
+# results/tables/   the condensed evidence behind every quoted number, and what
+#                   experiments/audit_numbers.py checks the write-up against.
+# notes/            the verified bibliography and the raw verification report.
+# *.zh-CN.md        the Chinese editions of the README and the report; a
+#                   translated document is a deliverable, not a build artefact.
+# data/DATASETS.md  provenance and licences for data too large to vendor.
+# .gitattributes    line-ending normalisation; without it a Windows and a Linux
+#                   checkout disagree on every file.
+# ---------------------------------------------------------------------------
+
+# --- datasets ---------------------------------------------------------------
+# 203 MB across 809 files, and separately licensed (113 of the Lithuanian fields
+# are non-commercial-use-only).  DATASETS.md records the DOI and URL to re-fetch
+# every one of them.
+data/*
+!data/DATASETS.md
+
+# --- Fields2Cover build artefacts ------------------------------------------
+# env/ holds the upstream source tree, the sdist, the container's tutorial
+# output and the exploratory comparison scripts from building the baseline.
+# tools/setup_fields2cover.sh rebuilds all of it from the ROS 2 deb.
+env/
+tools/out/
+tools/ros.key
+*.deb
+*.tar.gz
+
+# --- raw exchanged solutions for the head-to-head --------------------------
+# 334 MB across 1053 JSON files.  Regenerable in about two minutes with
+# experiments/export_cppclip.py plus the container sweep, and
+# experiments/exp_compare.py reduces it to results/tables/exp4_compare.csv,
+# which *is* tracked.
+results/f2c_io/
+
+# --- exploratory plots, not used by the report -----------------------------
+# Produced by tools/render_figures.py while looking for a useful picture.  The
+# figures the documents actually embed are tracked above.
+results/figures/intervals.png
+results/figures/plans_grid.png
+results/figures/plan_rectilinear.png

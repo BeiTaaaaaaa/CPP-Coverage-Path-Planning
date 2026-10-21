@@ -1,0 +1,30 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "cppclip"
+version = "0.1.0"
+description = "Clipping-driven coverage path planning for agricultural machinery, with dynamic incremental replanning"
+readme = "README.md"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+dependencies = ["numpy>=1.26", "shapely>=2.0"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8", "matplotlib>=3.8", "pandas>=2.0"]
+geo = ["scipy>=1.11"]
+# The Qt viewer.  PySide6-Essentials rather than full PySide6: the viewer needs
+# QtWidgets and an embedded matplotlib canvas, and the Addons/WebEngine half is
+# several hundred megabytes of nothing this project uses.
+gui = ["PySide6-Essentials>=6.6"]
+
+[project.scripts]
+cppclip-gui = "cppclip.gui:run"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
